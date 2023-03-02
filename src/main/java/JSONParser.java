@@ -1,3 +1,5 @@
+import com.google.gson.Gson;
+
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.util.*;
@@ -18,8 +20,10 @@ public class JSONParser {
         return Objects.isNull(object) ? "null" : String.valueOf(getObjectData(object));
     }
 
+    // Так как срок по заданию продлили, то метод fromJSON перепишу без использования GSON
     public static Object fromJSON(String json, Object object) {
-        return null;
+        if (Objects.isNull(json)||Objects.isNull(object)) return null;
+        return new Gson().fromJson(json, object.getClass());
     }
 
     private static StringBuilder getObjectData(Object object) {
