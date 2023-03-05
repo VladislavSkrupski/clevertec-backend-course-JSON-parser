@@ -1,4 +1,4 @@
-package fromJSON;
+package ru.clevertec.fromJSON;
 
 public class JSONStringParser {
     private static final char OBJECT_START_CHAR = '{';
@@ -9,6 +9,14 @@ public class JSONStringParser {
     private static final char COMMA_CHAR = ',';
     private static final char QUOTE_CHAR = '\"';
 
+    public enum ValueTrigger {
+        OBJECT,
+        ARRAY,
+        STRING,
+        NUMBER,
+        BOOLEAN,
+        NULL
+    }
 
     public enum State {
         OBJECT_START,
@@ -22,9 +30,7 @@ public class JSONStringParser {
         STRING_START,
         STRING_END,
         NUMBER_START,
-        NUMBER_END,
-        BOOLEAN_START,
-        NULL_START,
+        PAIR_START,
         STR_ESC,
         T,
         TR,
@@ -42,10 +48,6 @@ public class JSONStringParser {
         HEX3,
         HEX4
     }
-
-
-    private String json = "{\"a\":[1]}";
-
 
     public ObjectFromJSONAdapter parseJSON(String json) {
         char[] chars = json.toCharArray();
@@ -85,13 +87,21 @@ public class JSONStringParser {
                     if (Character.isWhitespace(chars[i])) continue;
                     switch (chars[i]) {
                         case ARRAY_START_CHAR -> {
-                            objectFromJSONAdapter.setState(State.VALUE_START);
                             objectFromJSONAdapter.incrementArrayDepth();
+                            objectFromJSONAdapter.setState(State.VALUE_START);
                             continue;
                         }
                         case ARRAY_END_CHAR -> {
                             objectFromJSONAdapter.decrementArrayDepth();
                             objectFromJSONAdapter.setState(State.ARRAY_END);
+                            continue;
+                        }
+                        case COMMA_CHAR -> {
+                            objectFromJSONAdapter.setState(State.VALUE_END);
+                            if (objectFromJSONAdapter.getArrayDepth() != 0)
+                                objectFromJSONAdapter.setState(State.VALUE_START);
+                            else
+                                objectFromJSONAdapter.setState(State.PAIR_START);
                             continue;
                         }
                         default -> {
@@ -105,7 +115,10 @@ public class JSONStringParser {
                     if (Character.isWhitespace(chars[i])) continue;
                     switch (chars[i]) {
                         case COMMA_CHAR -> {
-                            objectFromJSONAdapter.setState(State.VALUE_START);
+                            if (objectFromJSONAdapter.getArrayDepth() != 0)
+                                objectFromJSONAdapter.setState(State.VALUE_START);
+                            else
+                                objectFromJSONAdapter.setState(State.PAIR_START);
                             continue;
                         }
                         case OBJECT_END_CHAR -> {
@@ -113,12 +126,24 @@ public class JSONStringParser {
                             continue;
                         }
                         case ARRAY_END_CHAR -> {
-                            objectFromJSONAdapter.setState(State.ARRAY_END);
                             objectFromJSONAdapter.decrementArrayDepth();
+                            objectFromJSONAdapter.setState(State.ARRAY_END);
+                            if (objectFromJSONAdapter.getArrayDepth() == 0)
+                                objectFromJSONAdapter.setMap(ValueTrigger.ARRAY);
                             continue;
                         }
                         default -> throwException();
                     }
+                }
+                case PAIR_START: {
+                    if (Character.isWhitespace(chars[i])) continue;
+                    if (chars[i] == QUOTE_CHAR) {
+                        objectFromJSONAdapter.setState(State.NAME_START);
+                        continue;
+                    } else {
+                        throwException();
+                    }
+
                 }
                 case NAME_START: {
                     switch (chars[i]) {
@@ -164,7 +189,13 @@ public class JSONStringParser {
                             i++;
                             ObjectFromJSONAdapter temp = parseJSONChars(i, chars, new ObjectFromJSONAdapter(i, State.OBJECT_START));
                             objectFromJSONAdapter.setFieldObjectValue(temp);
-                            i = temp.getPosition();
+                            i = temp.getPosition() - 1;
+                            if (objectFromJSONAdapter.getArrayDepth() == 0) {
+                                objectFromJSONAdapter.setMap(ValueTrigger.OBJECT);
+                            } else {
+                                objectFromJSONAdapter.setState(State.VALUE_END);
+                                objectFromJSONAdapter.setState(State.VALUE_START);
+                            }
                             continue;
                         }
                         case OBJECT_END_CHAR -> {
@@ -172,13 +203,15 @@ public class JSONStringParser {
                             continue;
                         }
                         case ARRAY_START_CHAR -> {
-                            objectFromJSONAdapter.setState(State.ARRAY_START);
                             objectFromJSONAdapter.incrementArrayDepth();
+                            objectFromJSONAdapter.setState(State.ARRAY_START);
                             continue;
                         }
                         case ARRAY_END_CHAR -> {
                             objectFromJSONAdapter.decrementArrayDepth();
                             objectFromJSONAdapter.setState(State.ARRAY_END);
+                            if (objectFromJSONAdapter.getArrayDepth() == 0)
+                                objectFromJSONAdapter.setMap(ValueTrigger.ARRAY);
                             continue;
                         }
                         case 't' -> {
@@ -198,17 +231,14 @@ public class JSONStringParser {
                         }
                         case COMMA_CHAR -> {
                             if (objectFromJSONAdapter.getArrayDepth() != 0) {
-                                objectFromJSONAdapter.setState(State.VALUE_END);
+                                objectFromJSONAdapter.setState(State.VALUE_START);
                             } else {
-                                objectFromJSONAdapter.setState(State.NAME_START);
+                                objectFromJSONAdapter.setState(State.PAIR_START);
                             }
                             continue;
                         }
                         default -> throwException();
                     }
-                }
-                case VALUE_END: {
-
                 }
                 case OBJECT_END: {
                     break;
@@ -281,11 +311,17 @@ public class JSONStringParser {
                         case COMMA_CHAR -> {
                             objectFromJSONAdapter.setState(State.VALUE_END);
                             if (objectFromJSONAdapter.getArrayDepth() != 0)
-                                objectFromJSONAdapter.setState(State.OBJECT_START);
+                                objectFromJSONAdapter.setState(State.VALUE_START);
+                            else
+                                objectFromJSONAdapter.setState(State.PAIR_START);
                             continue;
                         }
                         case ARRAY_END_CHAR -> {
+                            objectFromJSONAdapter.setState(State.VALUE_END);
+                            objectFromJSONAdapter.decrementArrayDepth();
                             objectFromJSONAdapter.setState(State.ARRAY_END);
+                            if (objectFromJSONAdapter.getArrayDepth() == 0)
+                                objectFromJSONAdapter.setMap(ValueTrigger.ARRAY);
                             continue;
                         }
                         case OBJECT_END_CHAR -> {
@@ -333,11 +369,17 @@ public class JSONStringParser {
                         case COMMA_CHAR -> {
                             objectFromJSONAdapter.setState(State.VALUE_END);
                             if (objectFromJSONAdapter.getArrayDepth() != 0)
-                                objectFromJSONAdapter.setState(State.OBJECT_START);
+                                objectFromJSONAdapter.setState(State.VALUE_START);
+                            else
+                                objectFromJSONAdapter.setState(State.PAIR_START);
                             continue;
                         }
                         case ARRAY_END_CHAR -> {
+                            objectFromJSONAdapter.setState(State.VALUE_END);
+                            objectFromJSONAdapter.decrementArrayDepth();
                             objectFromJSONAdapter.setState(State.ARRAY_END);
+                            if (objectFromJSONAdapter.getArrayDepth() == 0)
+                                objectFromJSONAdapter.setMap(ValueTrigger.ARRAY);
                             continue;
                         }
                         case OBJECT_END_CHAR -> {
@@ -373,12 +415,16 @@ public class JSONStringParser {
                             if (objectFromJSONAdapter.getArrayDepth() != 0) {
                                 objectFromJSONAdapter.setState(State.VALUE_START);
                             } else {
-                                objectFromJSONAdapter.setState(State.OBJECT_START);
+                                objectFromJSONAdapter.setState(State.PAIR_START);
                             }
                             continue;
                         }
                         case ARRAY_END_CHAR -> {
+                            objectFromJSONAdapter.setState(State.VALUE_END);
+                            objectFromJSONAdapter.decrementArrayDepth();
                             objectFromJSONAdapter.setState(State.ARRAY_END);
+                            if (objectFromJSONAdapter.getArrayDepth() == 0)
+                                objectFromJSONAdapter.setMap(ValueTrigger.ARRAY);
                             continue;
                         }
                         case OBJECT_END_CHAR -> {

@@ -1,3 +1,5 @@
+package ru.clevertec;
+
 import com.google.gson.Gson;
 
 import java.lang.reflect.Array;

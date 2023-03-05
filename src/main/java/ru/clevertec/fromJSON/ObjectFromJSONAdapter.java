@@ -1,4 +1,4 @@
-package fromJSON;
+package ru.clevertec.fromJSON;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -10,7 +10,7 @@ public class ObjectFromJSONAdapter {
     private int position;
     private JSONStringParser.State state;
 
-    private JSONStringParser.State valueTrigger = null;
+    private JSONStringParser.ValueTrigger valueTrigger = JSONStringParser.ValueTrigger.OBJECT;
 
     private Map<String, Object> objectMap = new HashMap<>();
 
@@ -31,28 +31,12 @@ public class ObjectFromJSONAdapter {
         this.state = state;
     }
 
-    public List<Object> getFieldArrayValue() {
-        return fieldArrayValue;
-    }
-
-    public ObjectFromJSONAdapter getFieldObjectValue() {
-        return fieldObjectValue;
-    }
-
     public JSONStringParser.State getState() {
         return state;
     }
 
     public Map<String, Object> getObjectMap() {
         return objectMap;
-    }
-
-    public StringBuilder getFieldName() {
-        return fieldName;
-    }
-
-    public StringBuilder getFieldValue() {
-        return fieldValue;
     }
 
     public StringBuilder getHexValue() {
@@ -70,37 +54,59 @@ public class ObjectFromJSONAdapter {
     public void setState(JSONStringParser.State state) {
         this.state = state;
         switch (state) {
-            case STRING_START, NUMBER_START, BOOLEAN_START, ARRAY_START, OBJECT_START, ARRAY_END ->
-                    this.valueTrigger = state;
-            case T, F -> this.valueTrigger = JSONStringParser.State.BOOLEAN_START;
-            case N -> this.valueTrigger = JSONStringParser.State.NULL_START;
+            case STRING_START -> {
+                this.valueTrigger = JSONStringParser.ValueTrigger.STRING;
+            }
+            case NUMBER_START -> {
+                this.valueTrigger = JSONStringParser.ValueTrigger.NUMBER;
+            }
+            case T, F -> {
+                this.valueTrigger = JSONStringParser.ValueTrigger.BOOLEAN;
+            }
+            case ARRAY_START -> {
+                this.valueTrigger = JSONStringParser.ValueTrigger.ARRAY;
+            }
+            case OBJECT_START -> {
+                this.valueTrigger = JSONStringParser.ValueTrigger.OBJECT;
+            }
+            case N -> {
+                this.valueTrigger = JSONStringParser.ValueTrigger.NULL;
+            }
         }
-        if (state == JSONStringParser.State.VALUE_END
-                || state == JSONStringParser.State.OBJECT_END
-                || state == JSONStringParser.State.ARRAY_END) {
+        if (state == JSONStringParser.State.VALUE_END || state == JSONStringParser.State.OBJECT_END) {
             if (this.arrayDepth != 0) {
                 switch (valueTrigger) {
-                    case STRING_START, NUMBER_START -> fieldArrayValue.add(fieldValue.toString());
-                    case BOOLEAN_START -> fieldArrayValue.add(Boolean.valueOf(fieldValue.toString()));
-                    case OBJECT_START -> fieldArrayValue.add(fieldObjectValue);
+                    case STRING, NUMBER -> fieldArrayValue.add(fieldValue.toString());
+                    case BOOLEAN -> fieldArrayValue.add(Boolean.valueOf(fieldValue.toString()));
+                    case OBJECT, ARRAY -> fieldArrayValue.add(fieldObjectValue);
                 }
+                fieldValue.delete(0, fieldValue.length());
             }
             setMap();
-            fieldName.delete(0, fieldName.length());
-            fieldValue.delete(0, fieldValue.length());
-            hexValue.delete(0, hexValue.length());
-            if (arrayDepth == 0 && this.valueTrigger == JSONStringParser.State.ARRAY_END) fieldArrayValue.clear();
         }
     }
 
     private void setMap() {
         if (arrayDepth == 0) {
+            setMap(this.valueTrigger);
+        }
+    }
+
+    public void setMap(JSONStringParser.ValueTrigger valueTrigger) {
+        if (!fieldName.isEmpty()) {
             switch (valueTrigger) {
-                case STRING_START, NUMBER_START -> this.objectMap.put(fieldName.toString(), fieldValue.toString());
-                case BOOLEAN_START -> this.objectMap.put(fieldName.toString(), Boolean.valueOf(fieldValue.toString()));
-                case ARRAY_END -> this.objectMap.put(fieldName.toString(), fieldArrayValue);
-                case OBJECT_START -> this.objectMap.put(fieldName.toString(), fieldObjectValue);
+                case STRING, NUMBER -> this.objectMap.put(fieldName.toString(), fieldValue.toString());
+                case BOOLEAN -> this.objectMap.put(fieldName.toString(), Boolean.valueOf(fieldValue.toString()));
+                case ARRAY -> this.objectMap.put(fieldName.toString(), fieldArrayValue);
+                case OBJECT -> this.objectMap.put(fieldName.toString(), fieldObjectValue);
+                case NULL -> this.objectMap.put(fieldName.toString(), null);
             }
+            fieldName.delete(0, fieldName.length());
+            fieldValue.delete(0, fieldValue.length());
+            hexValue.delete(0, hexValue.length());
+            fieldObjectValue = null;
+            if (arrayDepth == 0)
+                fieldArrayValue = new ArrayList<>();
         }
     }
 

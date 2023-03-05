@@ -9,6 +9,9 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ru.clevertec.JSONParser;
+import ru.clevertec.TestProbe;
+import ru.clevertec.TestProbeHelper;
 
 import java.util.stream.Stream;
 
