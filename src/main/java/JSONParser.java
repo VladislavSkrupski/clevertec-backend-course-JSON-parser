@@ -20,9 +20,12 @@ public class JSONParser {
         return Objects.isNull(object) ? "null" : String.valueOf(getObjectData(object));
     }
 
-    // Так как срок по заданию продлили, то метод fromJSON перепишу без использования GSON
+    /*
+     Парсер из JSON в объект не дописан :( Вероятно грубоковато копаю...
+     Застрял на лексическом анализаторе (в пакете fromJSON) - нужно всё сносить и переписывать по факту
+     */
     public static Object fromJSON(String json, Object object) {
-        if (Objects.isNull(json)||Objects.isNull(object)) return null;
+        if (Objects.isNull(json) || Objects.isNull(object)) return null;
         return new Gson().fromJson(json, object.getClass());
     }
 
@@ -117,6 +120,7 @@ public class JSONParser {
 
     private static StringBuilder getArrayData(Field field, Object object) throws IllegalAccessException {
         StringBuilder builder = new StringBuilder();
+        setFieldAccessible(field, object);
         if (Objects.isNull(field.get(object))) return builder;
         builder.append(LEFT_SQUARE);
         List<Object> elements = new ArrayList<>();
